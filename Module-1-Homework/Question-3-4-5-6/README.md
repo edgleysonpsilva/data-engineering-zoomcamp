@@ -27,9 +27,13 @@ df_result = pd.read_sql(query, con=engine)
 print(df_result)
 
 ``` 
+
 Output:
+
+```bash
    count
 0   8007
+```
 
 # Question 4
 
@@ -54,13 +58,17 @@ LIMIT 5;
 df_result = pd.read_sql(query, con=engine)
 print(df_result)
 ```
+
 Output:
+
+```bash
    pickup_day  max_distance
 0  2025-11-14         88.03
 1  2025-11-20         73.84
 2  2025-11-23         45.26
 3  2025-11-22         40.16
 4  2025-11-15         39.81
+```
 
 # Question 5
 
@@ -93,6 +101,16 @@ LIMIT 5;
 df_q5 = pd.read_sql(query_q5, con=engine)
 print(df_q5)
 ```
+Output
+
+```bash
+                pickup_zone  total_sum
+0         East Harlem North    9281.92
+1         East Harlem South    6696.13
+2              Central Park    2378.79
+3  Washington Heights South    2139.05
+4       Morningside Heights    2100.59
+```
 
 
 # Question 6
@@ -123,4 +141,14 @@ LIMIT 5;
 
 df_q6 = pd.read_sql(query_q6, con=engine)
 print(df_q6)
-``
+```
+
+Output:
+
+```bash
+                    dropoff_zone  tip_amount
+0                 Yorkville West       81.89
+1              LaGuardia Airport       50.00
+2              East Harlem North       45.00
+3  Long Island City/Queens Plaza       34.25
+```
