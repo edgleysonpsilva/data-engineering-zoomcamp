@@ -152,3 +152,15 @@ Output:
 2              East Harlem North       45.00
 3  Long Island City/Queens Plaza       34.25
 ```
+
+# FINAL ANSWERS
+
+```bash
+Question 3: 8007
+
+Question 4: 2025-11-14
+
+Question 5: East Harlem North
+
+Questão 6: Yorkville West
+``
