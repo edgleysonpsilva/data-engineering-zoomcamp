@@ -10,3 +10,4 @@ df = pd.read_parquet(file_name)
 
 # send to postgres
 df.to_sql(name='green_trips', con=engine, if_exists='replace')
+#
