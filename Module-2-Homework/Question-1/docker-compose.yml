@@ -1,0 +1,85 @@
+services:
+  # --- Serviços do Módulo 1 ---
+  pgdatabase: 
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: 'postgres'
+      POSTGRES_PASSWORD: 'postgres'
+      POSTGRES_DB: 'ny_taxi'
+    ports:
+      - '5433:5432'
+    volumes:
+      - vol-pgdata:/var/lib/postgresql/data:z
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "pgadmin@pgadmin.com"
+      PGADMIN_DEFAULT_PASSWORD: "pgadmin"
+    ports:
+      - "8085:80"
+    volumes:
+      - vol-pgadmin_data:/var/lib/pgadmin:z
+
+  # --- Serviços do Kestra (Módulo 2) ---
+  kestra_postgres:
+    image: postgres:18
+    volumes:
+      # CORREÇÃO PRINCIPAL: Caminho sem /data e volume novo (v3)
+      - kestra_postgres_data_v3:/var/lib/postgresql:z
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  kestra:
+    image: kestra/kestra:v1.1
+    pull_policy: always
+    user: "root"
+    command: server standalone
+    volumes:
+      - kestra_data:/app/storage:z
+      - /var/run/docker.sock:/var/run/docker.sock:z
+      - /tmp/kestra-wd:/tmp/kestra-wd:z
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra_postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: k3str4
+        kestra:
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              basePath: "/app/storage"
+          queue:
+            type: postgres
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd/tmp
+          url: http://localhost:8080/
+    ports:
+      - "8080:8080"
+    depends_on:
+      kestra_postgres:
+        condition: service_started
+
+volumes:
+  vol-pgdata:
+    name: vol-pgdata
+  vol-pgadmin_data:
+    name: vol-pgadmin_data
+  kestra_data:
+    driver: local
+  # Volume novo para o banco do Kestra
+  kestra_postgres_data_v3:
+    driver: local
