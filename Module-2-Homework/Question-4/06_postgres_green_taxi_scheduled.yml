@@ -1,0 +1,78 @@
+id: 06_postgres_green_taxi_scheduled
+namespace: zoomcamp
+description: |
+  Fluxo para carga do Green Taxi (Estrutura Correta).
+
+inputs:
+  - id: taxi
+    type: SELECT
+    displayName: Select taxi type
+    values: [green]
+    defaults: green
+
+variables:
+  file: "{{inputs.taxi}}_tripdata_{{trigger.date | date('yyyy-MM')}}.csv"
+  table: "public.{{inputs.taxi}}_tripdata"
+  data: "{{outputs.extract.outputFiles[inputs.taxi ~ '_tripdata_' ~ (trigger.date | date('yyyy-MM')) ~ '.csv']}}"
+
+tasks:
+  - id: set_label
+    type: io.kestra.plugin.core.execution.Labels
+    labels:
+      file: "{{render(vars.file)}}"
+      taxi: "{{inputs.taxi}}"
+
+  - id: extract
+    type: io.kestra.plugin.scripts.shell.Commands
+    outputFiles:
+      - "*.csv"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - wget -qO- https://github.com/DataTalksClub/nyc-tlc-data/releases/download/{{inputs.taxi}}/{{render(vars.file)}}.gz | gunzip > {{render(vars.file)}}
+
+  - id: create_table
+    type: io.kestra.plugin.jdbc.postgresql.Query
+    url: jdbc:postgresql://pgdatabase:5432/ny_taxi
+    username: postgres
+    password: postgres
+    sql: |
+      CREATE TABLE IF NOT EXISTS {{render(vars.table)}} (
+        VendorID text,
+        lpep_pickup_datetime timestamp,
+        lpep_dropoff_datetime timestamp,
+        store_and_fwd_flag text,
+        RatecodeID text,
+        PULocationID text,
+        DOLocationID text,
+        passenger_count int,
+        trip_distance double precision,
+        fare_amount double precision,
+        extra double precision,
+        mta_tax double precision,
+        tip_amount double precision,
+        tolls_amount double precision,
+        ehail_fee double precision,
+        improvement_surcharge double precision,
+        total_amount double precision,
+        payment_type text,
+        trip_type text,
+        congestion_surcharge double precision
+      );
+
+  - id: copy_in
+    type: io.kestra.plugin.jdbc.postgresql.CopyIn
+    url: jdbc:postgresql://pgdatabase:5432/ny_taxi
+    username: postgres
+    password: postgres
+    format: CSV
+    table: "{{render(vars.table)}}"
+    from: "{{render(vars.data)}}"
+    header: true 
+
+triggers:
+  - id: green_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 11 1 * *"
+    inputs:
+      taxi: green
