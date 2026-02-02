@@ -1,5 +1,5 @@
 services:
-  # --- Serviços do Módulo 1 ---
+
   pgdatabase: 
     image: postgres:17-alpine
     environment:
@@ -21,11 +21,12 @@ services:
     volumes:
       - vol-pgadmin_data:/var/lib/pgadmin:z
 
-  # --- Serviços do Kestra (Módulo 2) ---
+
+
   kestra_postgres:
     image: postgres:18
     volumes:
-      # CORREÇÃO PRINCIPAL: Caminho sem /data e volume novo (v3)
+    
       - kestra_postgres_data_v3:/var/lib/postgresql:z
     environment:
       POSTGRES_DB: kestra
@@ -80,6 +81,6 @@ volumes:
     name: vol-pgadmin_data
   kestra_data:
     driver: local
-  # Volume novo para o banco do Kestra
+
   kestra_postgres_data_v3:
     driver: local
