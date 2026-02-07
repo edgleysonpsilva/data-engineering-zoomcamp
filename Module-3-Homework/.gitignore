@@ -1,0 +1,15 @@
+
+google_credentials.json
+
+*.parquet
+*.csv
+*.gz
+
+__pycache__/
+*.pyc
+
+.venv/
+env/
+
+.DS_Store
+.vscode/
