@@ -12,4 +12,5 @@ __pycache__/
 env/
 
 .DS_Store
-.vscode/
+.vscode/4
+.html
