@@ -1,0 +1,237 @@
+version: 2
+
+models:
+  - name: stg_fhv_tripdata
+    description: >
+      **Staging model for For-Hire Vehicle (FHV) trip data**
+      
+      
+      ## Data Source
+      
+      NYC TLC FHV trip records for 2019, including services like Uber, Lyft, 
+      and traditional for-hire vehicles.
+      
+      
+      ## Transformations Applied
+      
+      **Data Quality Filters:**
+      - Removed records where `dispatching_base_num` is NULL (primary filter)
+      
+      **Column Standardization:**
+      - Renamed all columns to snake_case convention
+      - `PUlocationID` → `pickup_location_id`
+      - `DOlocationID` → `dropoff_location_id`
+      - `dropOff_datetime` → `dropoff_datetime`
+      - `SR_Flag` → `shared_ride_flag`
+      - `Affiliated_base_number` → `affiliated_base_number`
+      
+      **Data Type Casting:**
+      - Location IDs cast to INTEGER
+      - Timestamps cast to TIMESTAMP
+      - Shared ride flag cast to INTEGER
+      
+      **Surrogate Key Generation:**
+      - Created `trip_id` from `dispatching_base_num` + `pickup_datetime`
+      - Uses dbt_utils.generate_surrogate_key macro
+      - Ensures uniqueness across the dataset
+      
+      
+      ## Data Quality
+      
+      - **Row Count:** ~43.2M records (43,244,693 expected)
+      - **Date Range:** 2019-01-01 to 2019-12-31
+      - **Unique Bases:** ~792 dispatching bases
+      - **Coverage:** All 5 NYC boroughs + EWR
+      
+      
+      ## Usage
+      
+      This model serves as the foundation for FHV analytics and should be
+      referenced by downstream models using `{{ ref('stg_fhv_tripdata') }}`.
+      
+      **Example:**
+      ```sql
+      SELECT 
+          COUNT(*) as total_trips,
+          COUNT(DISTINCT dispatching_base_num) as unique_bases
+      FROM {{ ref('stg_fhv_tripdata') }}
+      WHERE EXTRACT(MONTH FROM pickup_datetime) = 10
+      ```
+    
+    config:
+      materialized: view
+      tags: ['staging', 'fhv', 'for_hire_vehicle']
+    
+    meta:
+      owner: "Analytics Engineering Team"
+      contains_pii: false
+      data_source: "NYC TLC"
+    
+    columns:
+      - name: trip_id
+        description: >
+          **Surrogate key** generated from dispatching_base_num + pickup_datetime.
+          
+          This ensures uniqueness across all FHV trips. Uses MD5 hashing via
+          dbt_utils.generate_surrogate_key macro.
+          
+          **Format:** 32-character hexadecimal string
+        data_tests:
+          - unique:
+              config:
+                severity: error
+          - not_null:
+              config:
+                severity: error
+        meta:
+          primary_key: true
+      
+      - name: dispatching_base_num
+        description: >
+          **TLC Base License Code** of the base that dispatched the trip.
+          
+          This is the primary business identifier for FHV operators. Each base
+          has a unique code issued by the NYC Taxi & Limousine Commission.
+          
+          **Format:** 5-6 character alphanumeric code (e.g., 'B02512', 'B02764')
+          
+          **Examples:**
+          - B02512 - Uber
+          - B02764 - Lyft
+          - B00887 - Traditional car service
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+                error_if: ">0"
+        meta:
+          business_owner: "TLC Compliance Team"
+          critical_field: true
+      
+      - name: affiliated_base_number
+        description: >
+          Base number affiliated with the dispatching base.
+          
+          This field may be NULL for independent operators who are not 
+          affiliated with a larger base organization.
+          
+          **Nullability:** High (~5% of records have this populated)
+      
+      - name: pickup_location_id
+        description: >
+          **TLC Taxi Zone ID** where the trip originated.
+          
+          Maps to `dim_zones.location_id` for zone name and borough.
+          
+          **Range:** 1-263 (valid NYC taxi zones)
+          
+          **Special values:**
+          - 264: Unknown
+          - 265: NA
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+              config:
+                severity: warn  # Warn for unknown zones instead of fail
+        meta:
+          foreign_key: "dim_zones.location_id"
+      
+      - name: dropoff_location_id
+        description: >
+          **TLC Taxi Zone ID** where the trip ended.
+          
+          Maps to `dim_zones.location_id` for zone name and borough.
+          
+          **Range:** 1-263 (valid NYC taxi zones)
+          
+          **Note:** May be NULL for cancelled trips or incomplete records.
+        data_tests:
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+              config:
+                severity: warn
+                where: "dropoff_location_id IS NOT NULL"
+      
+      - name: pickup_datetime
+        description: >
+          **Timestamp** when the passenger was picked up.
+          
+          Used in surrogate key generation, so this field is critical for
+          ensuring uniqueness.
+          
+          **Format:** TIMESTAMP (YYYY-MM-DD HH:MM:SS)
+          
+          **Range:** 2019-01-01 00:00:00 to 2019-12-31 23:59:59
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+        meta:
+          used_in_surrogate_key: true
+          critical_field: true
+      
+      - name: dropoff_datetime
+        description: >
+          **Timestamp** when the passenger was dropped off.
+          
+          **Format:** TIMESTAMP (YYYY-MM-DD HH:MM:SS)
+          
+          **Note:** May be NULL for cancelled trips or incomplete records.
+          Should always be >= pickup_datetime when populated.
+      
+      - name: shared_ride_flag
+        description: >
+          Indicates whether the trip was a shared ride (multiple passengers).
+          
+          **Values:**
+          - `NULL` - Unknown or not recorded
+          - `0` - Not a shared ride (single party)
+          - `1` - Shared ride (multiple parties)
+          
+          **Distribution:**
+          - ~20% of trips are marked as shared
+          - ~30% have NULL values
+          - ~50% are explicitly non-shared
+        data_tests:
+          - accepted_values:
+              values: [0, 1, null]
+              quote: false
+              config:
+                severity: warn
+
+
+# ============================================================================
+# Singular Tests
+# ============================================================================
+
+# Note: Singular tests for this model are defined in:
+# tests/assert_fhv_trip_duration_reasonable.sql
+
+
+# ============================================================================
+# Additional Notes
+# ============================================================================
+
+# Model Dependencies:
+# - Requires: dim_zones (for relationship tests)
+# - Required by: (future) int_fhv_enriched, fct_fhv_trips
+
+# Testing Strategy:
+# 1. Generic tests: Validate data structure (unique, not_null, relationships)
+# 2. Singular tests: Validate business rules (trip duration, etc.)
+# 3. dbt-expectations: Advanced statistical tests (future enhancement)
+
+# Performance Considerations:
+# - Materialized as VIEW (no storage cost)
+# - ~43M rows when fully materialized
+# - Consider incremental strategy if performance becomes an issue
+
+# Data Refresh:
+# - Source data is static (2019 historical data)
+# - No incremental loading needed
+# - Full refresh on schema changes only

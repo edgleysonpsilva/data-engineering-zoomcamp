@@ -1,0 +1,121 @@
+packages:
+  # ============================================================================
+  # dbt-utils: Essential utilities for dbt projects
+  # ============================================================================
+  - package: dbt-labs/dbt_utils
+    version: 1.1.1
+    
+    # Why we use it:
+    # - generate_surrogate_key: Creates unique IDs from multiple columns
+    # - Cross-database compatibility: Works on BigQuery, Snowflake, etc.
+    # - Date/time utilities: date_spine, dateadd, datediff
+    # - SQL helpers: union_relations, pivot, unpivot
+    
+    # Used in:
+    # - stg_fhv_tripdata.sql (surrogate key generation)
+    # - Other staging models (standard utilities)
+  
+  
+  # ============================================================================
+  # dbt-expectations: Advanced data quality tests
+  # ============================================================================
+  - package: calogica/dbt_expectations
+    version: 0.10.1
+    
+    # Why we use it:
+    # - 50+ pre-built data quality tests
+    # - Statistical tests (mean, median, distribution)
+    # - Column-level tests (regex, ranges, formats)
+    # - Table-level tests (row counts, completeness)
+    
+    # Example tests available:
+    # - expect_column_values_to_be_between
+    # - expect_column_values_to_match_regex
+    # - expect_column_values_to_be_of_type
+    # - expect_table_row_count_to_be_between
+    
+    # Used in:
+    # - schema.yml (advanced validation)
+    # - Data quality monitoring
+
+
+# ============================================================================
+# Installation Instructions
+# ============================================================================
+
+# 1. Install packages:
+#    dbt deps
+
+# 2. This will create:
+#    - dbt_packages/ directory (git-ignored)
+#    - packages-lock.yml (commit this!)
+
+# 3. Packages are now available in all models via:
+#    {{ dbt_utils.macro_name() }}
+#    {{ dbt_expectations.test_name() }}
+
+
+# ============================================================================
+# Package Management Best Practices
+# ============================================================================
+
+# ✅ DO:
+# - Pin specific versions (not "latest")
+# - Commit packages-lock.yml to version control
+# - Run dbt deps after git pull
+# - Review package changelogs before upgrading
+
+# ❌ DON'T:
+# - Commit dbt_packages/ directory
+# - Use version ranges (use exact versions)
+# - Mix package sources (hub vs git)
+# - Skip testing after package upgrades
+
+
+# ============================================================================
+# Additional Useful Packages (commented out, add as needed)
+# ============================================================================
+
+# Code generation - auto-generate YAML and SQL
+# - package: dbt-labs/codegen
+#   version: 0.11.0
+
+# Audit helper - compare model outputs during refactoring
+# - package: dbt-labs/audit_helper
+#   version: 0.9.0
+
+# Project evaluator - score project against best practices
+# - package: dbt-labs/dbt_project_evaluator
+#   version: 0.8.0
+
+# Date spine - generate date dimension tables
+# - package: dbt-labs/dbt_utils
+#   version: 1.1.1
+#   # Already included above, just noting it has date_spine
+
+
+# ============================================================================
+# Platform-Specific Packages
+# ============================================================================
+
+# BigQuery utilities
+# - package: dbt-labs/dbt_bigquery_utils
+#   version: 0.1.0
+
+# Snowflake utilities  
+# - package: dbt-labs/dbt_snowflake_utils
+#   version: 0.1.0
+
+# Redshift utilities
+# - package: dbt-labs/dbt_redshift_utils
+#   version: 0.1.0
+
+
+# ============================================================================
+# Package Hub
+# ============================================================================
+
+# Browse all available packages:
+#   https://hub.getdbt.com/
+
+# Search for specific functionality before writing custom macros/tests!

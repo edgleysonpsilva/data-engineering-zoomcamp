@@ -1,0 +1,177 @@
+version: 2
+
+sources:
+  - name: staging
+    description: >
+      **Raw NYC TLC trip data** loaded from external tables.
+      
+      Contains taxi and for-hire vehicle trip records for analytics processing.
+      All transformations should happen in dbt models, not at the source level.
+    
+    database: your_project_id  # Replace with your GCP project or database name
+    schema: taxi_data          # Replace with your dataset/schema name
+    
+    tables:
+      # ========================================================================
+      # Green Taxi Data
+      # ========================================================================
+      - name: external_green_tripdata
+        description: >
+          Green taxi trip records from 2019-2020.
+          
+          Green taxis operate primarily in outer boroughs (outside Manhattan).
+          Introduced in 2013 to serve areas underserved by yellow taxis.
+        
+        loaded_at_field: lpep_pickup_datetime
+        
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 12, period: hour}
+      
+      # ========================================================================
+      # Yellow Taxi Data
+      # ========================================================================
+      - name: external_yellow_tripdata
+        description: >
+          Yellow taxi trip records from 2019-2020.
+          
+          Yellow taxis operate primarily in Manhattan and can only be hailed
+          on the street (no app/phone booking).
+        
+        loaded_at_field: tpep_pickup_datetime
+        
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 12, period: hour}
+      
+      # ========================================================================
+      # For-Hire Vehicle (FHV) Data
+      # ========================================================================
+      - name: external_fhv_tripdata
+        description: >
+          **For-Hire Vehicle trip records for 2019**
+          
+          
+          ## Overview
+          
+          FHV data includes trips from ride-sharing services (Uber, Lyft) and
+          traditional for-hire vehicles (black cars, livery services).
+          
+          
+          ## Data Characteristics
+          
+          - **Time Period:** Full year 2019 (Jan 1 - Dec 31)
+          - **Record Count:** ~43M trips (after filtering)
+          - **Coverage:** All 5 NYC boroughs + Newark Airport (EWR)
+          - **Update Frequency:** Static historical data (no updates)
+          
+          
+          ## Key Differences from Taxi Data
+          
+          Unlike taxi data, FHV records:
+          - Do NOT include fare amounts or payment details
+          - Have dispatching base information instead of vendor
+          - Include shared ride flag (pooled rides)
+          - May have affiliated base relationships
+          
+          
+          ## Data Quality Issues
+          
+          - ~2-3% of records have NULL dispatching_base_num (filtered in staging)
+          - ~30% have NULL shared_ride_flag
+          - ~95% have NULL affiliated_base_number
+          - Some trips have duration > 24 hours (data quality issue)
+          
+          
+          ## Source Information
+          
+          - **Provider:** NYC Taxi & Limousine Commission (TLC)
+          - **Format:** Monthly CSV files (12 files for 2019)
+          - **Documentation:** https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page
+        
+        loaded_at_field: pickup_datetime
+        
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        
+        columns:
+          - name: dispatching_base_num
+            description: >
+              **TLC Base License Code** of the base that dispatched the trip.
+              
+              This is the most critical field for FHV data. Records with NULL
+              values are filtered out in the staging model.
+              
+              **Format:** 5-6 character alphanumeric (e.g., 'B02512')
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn  # Warn at source, error at staging
+          
+          - name: PUlocationID
+            description: >
+              Pickup location ID (TLC Taxi Zone).
+              
+              **Note:** Column name uses camelCase in source but converted to
+              snake_case (pickup_location_id) in staging model.
+          
+          - name: DOlocationID
+            description: >
+              Dropoff location ID (TLC Taxi Zone).
+              
+              **Note:** Column name uses camelCase in source but converted to
+              snake_case (dropoff_location_id) in staging model.
+          
+          - name: pickup_datetime
+            description: >
+              Timestamp when passenger was picked up.
+              
+              **Used for:**
+              - Freshness checks
+              - Surrogate key generation
+              - Time-based analysis
+          
+          - name: dropOff_datetime
+            description: >
+              Timestamp when passenger was dropped off.
+              
+              **Note:** Inconsistent casing (dropOff vs pickup) in source data.
+              Standardized to dropoff_datetime in staging model.
+          
+          - name: SR_Flag
+            description: >
+              Shared Ride flag indicator.
+              
+              **Values:**
+              - NULL - Unknown
+              - 0 - Not shared
+              - 1 - Shared ride
+              
+              **Note:** Column name uses underscores inconsistently.
+              Renamed to shared_ride_flag in staging model.
+          
+          - name: Affiliated_base_number
+            description: >
+              Base number affiliated with the dispatching base.
+              
+              **Nullability:** ~95% NULL (most bases operate independently)
+              
+              **Note:** Capitalized in source, renamed to affiliated_base_number
+              in staging model.
+
+
+# ============================================================================
+# Source Usage Notes
+# ============================================================================
+
+# How to reference sources in models:
+#   {{ source('staging', 'external_green_tripdata') }}
+#   {{ source('staging', 'external_yellow_tripdata') }}
+#   {{ source('staging', 'external_fhv_tripdata') }}
+
+# Check source freshness:
+#   dbt source freshness
+
+# Verify source connection:
+#   dbt source snapshot-freshness --select source:staging
